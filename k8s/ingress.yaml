@@ -1,0 +1,94 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /api/clientes
+        pathType: Prefix
+        backend:
+          service:
+            name: svc-api-clientes
+            port:
+              number: 5000
+      - path: /healthcheck/clientes
+        pathType: Prefix
+        backend:
+          service:
+            name: svc-api-clientes
+            port:
+              number: 5000
+      - path: /metrics/clientes
+        pathType: Prefix
+        backend:
+          service:
+            name: svc-api-clientes
+            port:
+              number: 5000
+      - path: /api/enderecos
+        pathType: Prefix
+        backend:
+          service:
+            name: svc-api-enderecos
+            port:
+              number: 5100
+      - path: /healthcheck/enderecos
+        pathType: Prefix
+        backend:
+          service:
+            name: svc-api-enderecos
+            port:
+              number: 5100
+      - path: /metrics/enderecos
+        pathType: Prefix
+        backend:
+          service:
+            name: svc-api-enderecos
+            port:
+              number: 5100
+      - path: /api/produtos
+        pathType: Prefix
+        backend:
+          service:
+            name: svc-api-produtos
+            port:
+              number: 5200
+      - path: /healthcheck/produtos
+        pathType: Prefix
+        backend:
+          service:
+            name: svc-api-produtos
+            port:
+              number: 5200
+      - path: /metrics/produtos
+        pathType: Prefix
+        backend:
+          service:
+            name: svc-api-produtos
+            port:
+              number: 5200
+      - path: /api/vendas
+        pathType: Prefix
+        backend:
+          service:
+            name: svc-api-inventario
+            port:
+              number: 5300
+      - path: /healthcheck/vendas
+        pathType: Prefix
+        backend:
+          service:
+            name: svc-api-inventario
+            port:
+              number: 5300
+      - path: /metrics/vendas
+        pathType: Prefix
+        backend:
+          service:
+            name: svc-api-inventario
+            port:
+              number: 5300

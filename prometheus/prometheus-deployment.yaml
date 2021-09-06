@@ -1,0 +1,38 @@
+# Container do Prometheus
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-prometheus
+  namespace: monitoring
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: prometheus-pod
+      labels:
+        app: prometheus
+    spec:
+      serviceAccountName: prometheus
+      containers:
+        - name: prometheus-container
+          image: prom/prometheus:v2.28.1
+          ports:  
+            - containerPort: 9090
+          args:
+            - '--storage.tsdb.retention=24h'
+            - '--config.file=/etc/prometheus/prometheus.yml'
+            - '--web.external-url=/prometheus/'
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/prometheus
+          resources:
+            limits:
+              cpu: 250m
+              memory: 1Gi
+      volumes:
+        - name: config-volume
+          configMap:
+            name: prometheus-server-conf
+  selector:
+    matchLabels:
+      app: prometheus
