@@ -1,0 +1,132 @@
+# & sets up the name of the anchor (job_configuration), 
+#<< means “merge the given hash into the current one,” and * includes the named anchor (job_configuration again).
+
+.install_docker_templete: &install_docker 
+  before_script:
+  - apt update
+  - apt install -y curl
+  - curl -fsSL get.docker.com -o get-docker.sh
+  - sh get-docker.sh
+  - docker info
+  - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD
+ 
+.install_aws_cli_and_kubectl: &install_aws_cli_and_kubectl
+  before_script:
+  - apt update
+  - apt install -y curl
+  - apt install -y unzip
+  - apt install -y python3
+  - apt install -y gnupg1
+  - apt install -y gnupg
+  - apt install -y gnupg2
+  - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+  - unzip awscliv2.zip
+  - ./aws/install
+  - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+  - install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+  - aws configure set default.region $AWS_DEFAULT_REGION
+  - aws configure set aws_access_key_id $
+  - aws configure set aws_secret_access_key $
+  - export AWS_ACCESS_KEY_ID=${AccessKeyId}
+  - export AWS_SECRET_ACCESS_KEY=${SecretAccessKey}
+  - export AWS_SESSION_TOKEN=${SessionToken}
+  - aws eks update-kubeconfig --name eks-cluster-vdep
+
+image: ubuntu:20.04
+
+stages:
+- build
+- deploy
+- deploy_monitoring
+- deploy_monitoring_pt2
+- notify
+- destroy
+
+Api-Clientes:
+  <<: *install_docker
+  stage: build
+  script:  
+  - docker build -t api-clientes-prometheus -f api-clientes/Dockerfile .
+  - docker tag api-clientes-prometheus viniciusdep/api-clientes-prometheus
+  - docker push viniciusdep/api-clientes-prometheus
+
+Api-Enderecos:
+  <<: *install_docker
+  stage: build
+  script:  
+  - docker build -t api-enderecos-prometheus -f api-enderecos/Dockerfile .
+  - docker tag api-enderecos-prometheus viniciusdep/api-enderecos-prometheus
+  - docker push viniciusdep/api-enderecos-prometheus
+
+Api-Produtos:
+  <<: *install_docker
+  stage: build
+  script:  
+  - docker build -t api-produtos-prometheus -f api-produtos/Dockerfile .
+  - docker tag api-produtos-prometheus viniciusdep/api-produtos-prometheus
+  - docker push viniciusdep/api-produtos-prometheus
+
+Api-Inventario:
+  <<: *install_docker
+  stage: build
+  script:  
+  - docker build -t api-inventario-prometheus -f api-inventario/Dockerfile .
+  - docker tag api-inventario-prometheus viniciusdep/api-inventario-prometheus
+  - docker push viniciusdep/api-inventario-prometheus
+
+deploy_clusterEKS:
+  <<: *install_aws_cli_and_kubectl
+  stage: deploy
+  dependencies:
+  - Api-Clientes
+  - Api-Enderecos
+  - Api-Produtos
+  - Api-Inventario
+  script:
+  - kubectl apply -f k8s/deploy.yaml
+  - kubectl apply -f apis
+  - kubectl apply -f k8s/ingress.yaml
+
+deploy_monitoring_grafana/alertmanager:
+  <<: *install_aws_cli_and_kubectl
+  stage: deploy_monitoring
+  dependencies:
+  - deploy_clusterEKS
+  script:
+  - kubectl create namespace monitoring
+  - kubectl apply -f grafana
+  - kubectl apply -f alertmanager
+  
+deploy_monitoring_prometheus:
+  <<: *install_aws_cli_and_kubectl
+  stage: deploy_monitoring_pt2
+  dependencies:
+  - deploy_monitoring_grafana/alertmanager
+  script:
+  - kubectl apply -f prometheus
+  when: manual
+  
+
+notificacao-sucesso:
+  stage: notify
+  when: on_success
+  script:
+  - sh notificacaosuccess.sh
+
+notificacao-falha:
+  stage: notify
+  when: on_failure
+  script:
+  - sh notificacaofailure.sh
+
+destroy:
+  <<: *install_aws_cli_and_kubectl
+  stage: destroy
+  dependencies:
+  - deploy_monitoring_prometheus
+  script:
+  - kubectl delete deployment --all
+  - kubectl delete ingress --all
+  - kubectl delete svc --all
+  - kubectl delete pods --all
+  when: manual
